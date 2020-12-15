@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div>
+
+    <div>
+        <button id="download-csv">Download CSV</button>
+        <button id="download-json">Download JSON</button>
+        <button id="download-xlsx">Download XLSX</button>
+        <button id="download-pdf">Download PDF</button>
+        <button id="download-html">Download HTML</button>
+    </div>
+
+    <select id="sort-field">
+        <option></option>
+        <option value="first_name">First Name</option>
+        <option value="last_name">Last Name</option>
+        <option value="email">Email</option>
+        <option value="phone">Phone</option>
+    </select>
+
+    <select id="sort-direction">
+        <option value="asc" selected>asc</option>
+        <option value="desc">desc</option>
+    </select>
+
+  <button id="sort-trigger">Trigger Sort</button>
+</div>
+    
+<div>
+    <select id="filter-field">
+      <option></option>
+      <option value="first_name">First Name</option>
+      <option value="last_name">Last Name</option>
+      <option value="email">Email</option>
+      <option value="phone">Phone</option>
+    </select>
+  
+    <select id="filter-type">
+      <option value="=">=</option>
+      <option value="<"><</option>
+      <option value="<="><=</option>
+      <option value=">">></option>
+      <option value=">=">>=</option>
+      <option value="!=">!=</option>
+      <option value="like">like</option>
+    </select>
+  
+    <input id="filter-value" type="text" placeholder="value to filter">
+
+    <input type="submit" id="filter-clear" value="Clear">
+  </div>
+
+
+    <div id="my-table">
+    </div>
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+    var fieldElSort = document.getElementById("sort-field");
+    var dirEl = document.getElementById("sort-direction");
+
+    //Define variables for input elements
+    var fieldEl = document.getElementById("filter-field");
+    var typeEl = document.getElementById("filter-type");
+    var valueEl = document.getElementById("filter-value");
+
+    //Custom filter example
+    // function customFilter(data){
+    //     return data.car && data.rating < 3;
+    // }
+
+    //Trigger setFilter function with correct parameters
+    function updateFilter(){
+    var filterVal = fieldEl.options[fieldEl.selectedIndex].value;
+    var typeVal = typeEl.options[typeEl.selectedIndex].value;
+
+    var filter = filterVal == "function" ? customFilter : filterVal;
+
+    if(filterVal == "function" ){
+        typeEl.disabled = true;
+        valueEl.disabled = true;
+    }else{
+        typeEl.disabled = false;
+        valueEl.disabled = false;
+    }
+
+    if(filterVal){
+        table.setFilter(filter,typeVal, valueEl.value);
+    }
+    }
+
+    //Update filters on value change
+    document.getElementById("filter-field").addEventListener("change", updateFilter);
+    document.getElementById("filter-type").addEventListener("change", updateFilter);
+    document.getElementById("filter-value").addEventListener("keyup", updateFilter);
+
+    //Clear filters on "Clear Filters" button click
+    document.getElementById("filter-clear").addEventListener("click", function(){
+    fieldEl.value = "";
+    typeEl.value = "=";
+    valueEl.value = "";
+
+    table.clearFilter();
+    });
+
+
+    
+        // get CSRF token
+        // https://docs.djangoproject.com/en/dev/ref/csrf/#acquiring-the-token-if-csrf-use-sessions-and-csrf-cookie-httponly-are-false
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+                }
+            }
+            }
+            return cookieValue;
+        }
+
+        var CSRF_TOKEN = getCookie('csrftoken');
+
+        // set variable to customise ajaxConfig for use in the setData call
+        var ajaxConfigPut = {
+                method:"PATCH", //set request type to Position
+                headers: {
+                    // "Content-type": 'application/json; charset=utf-8', //set specific content type
+                    'X-CSRFTOKEN': CSRF_TOKEN,
+                },
+        };
+
+    
+    //create Tabulator on DOM element with id "example-table"
+    var table  = new Tabulator("#my-table", {
+        ajaxURL:"{% url 'list' %}", // url path to the api
+        layout: "fitColumns",
+        pagination:"local",
+        paginationSize:6,
+        paginationSizeSelector:[3, 6, 8, 10],
+        selectable:true,
+        // groupBy:"first_name",
+        columns: [ //define table columns
+                    {title: "ID", field:"id", witdth:150, frozen:true},
+                    {title: "First Name", field:"first_name", witdth:150, editor:true},
+                    {title: "Last Name", field:"last_name", witdth:150, editor:"input"},
+                    {title: "Phone Number", field:"phone", witdth:150},
+                    {title: "Email", field:"email", witdth:150},
+        ],
+
+
+        // see http://tabulator.info/docs/4.6/components#component-cell
+        cellEdited:function(cell){ //trigger an alert message when the row is clicked
+                console.log("Cell edited in row " + cell.getData().id 
+                        + " and column " + cell.getField()
+                        + " from " + cell.getOldValue() + " to " 
+                        + cell.getValue()
+                        + ". The row pk=" + cell.getData().id 
+                        );
+                console.log(cell.getData());
+
+                var updateurl = "{% url 'list'  %}" + cell.getData().id + "/"
+                console.log('URL is: ' + updateurl)
+                // Create variable from full row data but drop the id;
+                console.log('About to create updateData')
+
+                var updateData = {};
+                updateData[cell.getField()] = cell.getValue();
+
+                console.log(updateData);
+
+                console.log('About to setData');
+                table.setData(updateurl, updateData, ajaxConfigPut);
+                console.log('Finished setData');
+                //cell.restoreOldValue();
+            },
+            ajaxResponse:function(url, params, response){
+                console.log('Beginning ajaxResponse')
+                console.log('The type is:', typeof(response));
+                console.log(Array.isArray(response))
+                console.log(response)
+                result = response;
+                if(Array.isArray(response) === false){
+                    result = [response];
+                };
+                return result;
+            },
+
+        
+    });
+
+
+    //Trigger sort when "Trigger Sort" button is clicked
+    document.getElementById("sort-trigger").addEventListener("click", function(){
+    table.setSort(fieldElSort.options[fieldElSort.selectedIndex].value, dirEl.options[dirEl.selectedIndex].value);
+    });
+
+
+//trigger download of data.csv file
+document.getElementById("download-csv").addEventListener("click", function(){
+    table.download("csv", "data.csv");
+});
+
+//trigger download of data.json file
+document.getElementById("download-json").addEventListener("click", function(){
+    table.download("json", "data.json");
+});
+
+//trigger download of data.xlsx file
+document.getElementById("download-xlsx").addEventListener("click", function(){
+    table.download("xlsx", "data.xlsx", {sheetName:"My Data"});
+});
+
+//trigger download of data.pdf file
+document.getElementById("download-pdf").addEventListener("click", function(){
+    table.download("pdf", "data.pdf", {
+        orientation:"portrait", //set page orientation to portrait
+        title:"Example Report", //add title to report
+    });
+});
+
+//trigger download of data.html file
+document.getElementById("download-html").addEventListener("click", function(){
+    table.download("html", "data.html", {style:true});
+});
+
+
+
+</script>
+
+{% endblock %}
